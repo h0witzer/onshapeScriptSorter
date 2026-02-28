@@ -1,0 +1,255 @@
+.osss-menu-root,
+.osss-submenu {
+  min-width: 230px;
+  overflow: visible;
+}
+
+.os-tool-dropdown,
+.os-tool-dropdown-content {
+  overflow: visible !important;
+}
+
+.custom-toolbar .tool.osss-folder,
+.osss-menu-root .osss-folder {
+  overflow: visible !important;
+}
+
+.osss-menu-item {
+  position: relative;
+  white-space: nowrap;
+}
+
+.osss-menu-item.osss-folder::after {
+  content: "▶";
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 10px;
+}
+
+.osss-submenu {
+  display: none;
+  position: absolute;
+  top: 0;
+  left: 100%;
+  right: auto;
+  z-index: 10000;
+  border: 1px solid #6a6a6a;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+}
+
+.osss-folder.osss-open-left > .osss-submenu {
+  left: auto;
+  right: 100%;
+}
+
+.osss-folder.osss-open-right > .osss-submenu {
+  left: 100%;
+  right: auto;
+}
+
+.osss-menu-item.osss-folder:hover > .osss-submenu {
+  display: block;
+}
+
+.osss-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 2147483645;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.osss-modal {
+  width: 50vw;
+  height: 80vh;
+  max-width: 95vw;
+  max-height: 95vh;
+  display: flex;
+  flex-direction: column;
+  background: #1f1f1f;
+  color: #e2e2e2;
+  border: 1px solid #3a3a3a;
+  border-radius: 8px;
+  overflow: hidden;
+  font-family: Arial, sans-serif;
+}
+
+.osss-modal-header {
+  padding: 12px 14px;
+  border-bottom: 1px solid #353535;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.osss-modal-title { font-size: 14px; font-weight: 600; }
+
+.osss-modal-body {
+  padding: 12px 14px;
+  overflow: hidden;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.osss-layout {
+  display: grid;
+  grid-template-columns: 1.1fr 1.3fr 1.2fr;
+  gap: 12px;
+  min-height: 0;
+  flex: 1;
+}
+
+.osss-pane {
+  border: 1px solid #353535;
+  border-radius: 6px;
+  background: #222;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.osss-pane-header {
+  padding: 8px 10px;
+  border-bottom: 1px solid #353535;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+
+.osss-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.osss-btn {
+  border: 1px solid #444;
+  background: #2a2a2a;
+  color: #ddd;
+  padding: 6px 10px;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.osss-btn:hover { background: #333; }
+
+.osss-tree,
+.osss-tree ul {
+  list-style: none;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.osss-tree-root {
+  padding: 6px;
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+}
+
+.osss-tools-list,
+.osss-tool-details {
+  padding: 8px;
+  overflow: auto;
+  min-height: 0;
+  flex: 1;
+}
+
+.osss-node-row {
+  padding: 6px 8px;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  user-select: none;
+}
+
+.osss-node-row[draggable="true"] { cursor: grab; }
+.osss-node-row:active { cursor: grabbing; }
+
+.osss-node-row:hover { background: #2c2c2c; }
+.osss-node-row.osss-drop-target { outline: 1px solid #58a6ff; }
+.osss-node-row.osss-selected { outline: 1px solid #58a6ff; }
+
+.osss-node-row-folder {
+  background: #2b3a2e;
+}
+
+.osss-node-row-folder:hover {
+  background: #334739;
+}
+
+.osss-node-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.osss-node-icon {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 18px;
+}
+
+.osss-node-icon .tool-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.osss-node-icon .tool-icon img,
+.osss-node-icon .tool-icon .os-svg-icon,
+.osss-node-icon .tool-icon .tool-initials-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.osss-node-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.osss-detail-empty {
+  color: #9a9a9a;
+  font-size: 12px;
+}
+
+.osss-detail-title {
+  margin-bottom: 8px;
+}
+
+.osss-detail-row {
+  font-size: 12px;
+  color: #d0d0d0;
+  margin-bottom: 8px;
+  line-height: 1.35;
+}
+
+.osss-detail-desc {
+  margin-top: 4px;
+}
+
+.osss-node-tools {
+  display: flex;
+  gap: 4px;
+}
+
+.osss-hint {
+  color: #a6a6a6;
+  font-size: 12px;
+  margin-bottom: 10px;
+}

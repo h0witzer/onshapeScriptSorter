@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "Onshape Script Sorter",
+  "description": "Organize custom FeatureScripts into folders and show a cascading dropdown on cad.onshape.com.",
+  "version": "0.1.1",
+  "permissions": ["storage", "tabs"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Onshape Script Sorter"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://cad.onshape.com/*"],
+      "js": ["content.js"],
+      "css": ["styles.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}
