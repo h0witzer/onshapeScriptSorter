@@ -235,18 +235,6 @@
 
     renderNodes(effectiveTree, menuRoot);
 
-    // Prevent right-click (contextmenu) events originating from a moved tool element
-    // from bubbling up to Onshape's dropdown dismissal logic.  The event still fires
-    // on the real tool.el first (showing Onshape's native Update/Remove/… context
-    // menu) before being caught here and stopped.  We only stop propagation when the
-    // event came from a tool — right-clicks on folder rows or empty areas are left to
-    // bubble normally.
-    menuRoot.addEventListener("contextmenu", (e) => {
-      if (e.target.closest(".osss-moved-tool")) {
-        e.stopPropagation();
-      }
-    });
-
     dropdownContent.appendChild(menuRoot);
 
     // Close all open submenus when the user clicks outside the menu.
