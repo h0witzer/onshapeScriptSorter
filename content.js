@@ -18,6 +18,12 @@
   // open state survives a full buildMenu re-render (which Onshape can trigger by
   // hiding/recreating the dropdown element when showing its right-click dialog).
   const openFolderIds = new Set();
+  // Set to true when a contextmenu event fires on an osss-moved-tool element.
+  // Onshape's contextmenu handler can dispatch a synthetic click to close other
+  // popups before showing its Update/Remove dialog; that synthetic click would
+  // otherwise trigger our document click listener and collapse open subfolders.
+  // The flag tells the document click listener to skip one cycle in that case.
+  let pendingRightClickInMenu = false;
 
   async function getStoredTree() {
     if (typeof chrome !== "undefined" && chrome.storage?.local) {
@@ -297,14 +303,32 @@
     };
     dropdownContent.addEventListener("mousedown", currentMenuMousedownListener);
 
+    // Onshape's contextmenu handler can dispatch a synthetic click (to dismiss its own
+    // open popovers) before showing the Update/Remove dialog.  That synthetic click
+    // reaches our document-level listener and collapses any open subfolders.  Detect
+    // the contextmenu-inside-moved-tool case and tell the document click listener to
+    // skip one cycle so the subfolder stays open while the dialog is visible.
+    menuRoot.addEventListener("contextmenu", (e) => {
+      if (e.target.closest(".osss-moved-tool")) {
+        pendingRightClickInMenu = true;
+      }
+    });
+
     // Close all open submenus when the user clicks outside the menu.
     if (currentMenuClickListener) {
       document.removeEventListener("click", currentMenuClickListener);
     }
-    currentMenuClickListener = () => {
+    currentMenuClickListener = (e) => {
       if (!menuRoot.isConnected) {
         document.removeEventListener("click", currentMenuClickListener);
         currentMenuClickListener = null;
+        return;
+      }
+      // Suppress one outside-click cycle when it originates from interacting with
+      // Onshape's contextmenu dialog (which appeared after a right-click inside one
+      // of our moved-tool elements).
+      if (pendingRightClickInMenu) {
+        pendingRightClickInMenu = false;
         return;
       }
       menuRoot.querySelectorAll(".osss-folder.osss-open").forEach((f) => {
