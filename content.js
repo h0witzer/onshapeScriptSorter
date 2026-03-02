@@ -145,31 +145,26 @@
     };
 
     const chooseSubmenuDirection = (folderEl, submenuEl) => {
-      const prevDisplay = submenuEl.style.display;
-      const prevVisibility = submenuEl.style.visibility;
-      const prevLeft = submenuEl.style.left;
-      const prevRight = submenuEl.style.right;
+      const folderRect = folderEl.getBoundingClientRect();
 
+      // Temporarily show to measure the submenu width.
       submenuEl.style.visibility = "hidden";
       submenuEl.style.display = "block";
-      submenuEl.style.left = "100%";
-      submenuEl.style.right = "auto";
-
       const submenuWidth = submenuEl.getBoundingClientRect().width || 230;
-      const folderRect = folderEl.getBoundingClientRect();
+      submenuEl.style.display = "";
+      submenuEl.style.visibility = "";
+
       const spaceRight = window.innerWidth - folderRect.right;
       const spaceLeft = folderRect.left;
 
-      submenuEl.style.display = prevDisplay;
-      submenuEl.style.visibility = prevVisibility;
-      submenuEl.style.left = prevLeft;
-      submenuEl.style.right = prevRight;
+      submenuEl.style.top = folderRect.top + "px";
 
-      folderEl.classList.remove("osss-open-left", "osss-open-right");
       if (spaceRight < submenuWidth && spaceLeft > spaceRight) {
-        folderEl.classList.add("osss-open-left");
+        submenuEl.style.left = "auto";
+        submenuEl.style.right = (window.innerWidth - folderRect.left) + "px";
       } else {
-        folderEl.classList.add("osss-open-right");
+        submenuEl.style.left = folderRect.right + "px";
+        submenuEl.style.right = "auto";
       }
     };
 
