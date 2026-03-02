@@ -13,7 +13,7 @@
   };
 
   let currentMenuClickListener = null;
-  let currentMenuContextMenuListener = null;
+  let currentMenuMousedownListener = null;
 
   async function getStoredTree() {
     if (typeof chrome !== "undefined" && chrome.storage?.local) {
@@ -238,25 +238,31 @@
 
     dropdownContent.appendChild(menuRoot);
 
-    // Stop the contextmenu event from bubbling past dropdownContent once Onshape's own
-    // contextmenu handler (registered earlier on the same element) has run and shown its
-    // native context menu.  Without this, a parent-level listener hides the dropdown
-    // while the Onshape context-menu dialog floats without its backing folder structure.
-    // We only intercept events that originate inside our moved-tool elements.
-    if (currentMenuContextMenuListener) {
-      dropdownContent.removeEventListener("contextmenu", currentMenuContextMenuListener);
+    // When the user right-clicks a tool inside one of our folders the browser fires
+    // mousedown (button=2) → mouseup → contextmenu in sequence.  Onshape's own
+    // contextmenu handler lives on a parent element above dropdownContent and correctly
+    // calls preventDefault() + shows its Update/Remove dialog.  However, a separate
+    // document-level mousedown listener (Bootstrap / Onshape dropdown management) also
+    // fires and collapses the dropdown before contextmenu even arrives.
+    //
+    // Fix: stop right-click mousedown from bubbling past dropdownContent for events
+    // that originate inside our moved-tool elements.  This prevents the dropdown-close
+    // handler on document from running while leaving the contextmenu event completely
+    // free to bubble up to Onshape's own handler.
+    if (currentMenuMousedownListener) {
+      dropdownContent.removeEventListener("mousedown", currentMenuMousedownListener);
     }
-    currentMenuContextMenuListener = (e) => {
+    currentMenuMousedownListener = (e) => {
       if (!menuRoot.isConnected) {
-        dropdownContent.removeEventListener("contextmenu", currentMenuContextMenuListener);
-        currentMenuContextMenuListener = null;
+        dropdownContent.removeEventListener("mousedown", currentMenuMousedownListener);
+        currentMenuMousedownListener = null;
         return;
       }
-      if (e.target.closest(".osss-moved-tool")) {
+      if (e.button === 2 && e.target.closest(".osss-moved-tool")) {
         e.stopPropagation();
       }
     };
-    dropdownContent.addEventListener("contextmenu", currentMenuContextMenuListener);
+    dropdownContent.addEventListener("mousedown", currentMenuMousedownListener);
 
     // Close all open submenus when the user clicks outside the menu.
     if (currentMenuClickListener) {
