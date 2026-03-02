@@ -1,5 +1,7 @@
 (() => {
   const STORAGE_KEY = "onshapeScriptSorter.tree.v1";
+  // Onshape's dark mode sets this color (#333333) as the body background.
+  const ONSHAPE_DARK_BG = "rgb(51, 51, 51)";
 
   const state = {
     lastSignature: "",
@@ -115,6 +117,11 @@
     return base;
   }
 
+  function isOnshapeDarkMode() {
+    // Onshape's dark mode applies #333333 (rgb(51,51,51)) as the body background.
+    return getComputedStyle(document.body).backgroundColor === ONSHAPE_DARK_BG;
+  }
+
   function buildMenu(dropdownContent, effectiveTree, currentTools) {
     // Remove previous custom UI if any.
     dropdownContent.querySelectorAll(".osss-menu-root").forEach((n) => n.remove());
@@ -127,6 +134,7 @@
 
     const menuRoot = document.createElement("div");
     menuRoot.className = "osss-menu-root";
+    menuRoot.classList.toggle("osss-dark", isOnshapeDarkMode());
 
     const createToolVisual = (tool, fallbackTitle) => {
       const frag = document.createDocumentFragment();
@@ -251,6 +259,7 @@
 
     const backdrop = document.createElement("div");
     backdrop.className = "osss-modal-backdrop";
+    backdrop.classList.toggle("osss-dark", isOnshapeDarkMode());
 
     const modal = document.createElement("div");
     modal.className = "osss-modal";
@@ -805,6 +814,17 @@
   function init() {
     findAndProcess();
     startObserver();
+
+    // Re-theme extension UI whenever Onshape's own dark/light mode changes.
+    let _lastDark = isOnshapeDarkMode();
+    new MutationObserver(() => {
+      const dark = isOnshapeDarkMode();
+      if (dark === _lastDark) return;
+      _lastDark = dark;
+      document.querySelectorAll(".osss-menu-root, .osss-modal-backdrop").forEach((el) => {
+        el.classList.toggle("osss-dark", dark);
+      });
+    }).observe(document.body, { attributes: true, attributeFilter: ["class", "style"] });
 
     if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
       chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {

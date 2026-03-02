@@ -21,29 +21,27 @@
   --osss-shadow:          rgba(0, 0, 0, 0.15);
 }
 
-/* --- Dark mode overrides — Onshape dark mode background is #333333 --- */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --osss-bg-surface:      #333333;
-    --osss-bg-modal:        #2c2c2c;
-    --osss-bg-pane:         #303030;
-    --osss-bg-btn:          #3c3c3c;
-    --osss-bg-btn-hover:    #464646;
-    --osss-bg-hover:        #3d3d3d;
-    --osss-bg-folder:       #2d3d30;
-    --osss-bg-folder-hover: #354739;
-    --osss-text-primary:    #e2e2e2;
-    --osss-text-btn:        #dddddd;
-    --osss-text-muted:      #9a9a9a;
-    --osss-text-detail:     #d0d0d0;
-    --osss-text-hint:       #a6a6a6;
-    --osss-border:          #4a4a4a;
-    --osss-border-pane:     #444444;
-    --osss-border-btn:      #555555;
-    --osss-border-submenu:  #5a5a5a;
-    --osss-accent:          #58a6ff;
-    --osss-shadow:          rgba(0, 0, 0, 0.35);
-  }
+/* --- Dark mode overrides — toggled by JS when Onshape's dark mode is active (#333333 bg) --- */
+.osss-dark {
+  --osss-bg-surface:      #333333;
+  --osss-bg-modal:        #2c2c2c;
+  --osss-bg-pane:         #303030;
+  --osss-bg-btn:          #3c3c3c;
+  --osss-bg-btn-hover:    #464646;
+  --osss-bg-hover:        #3d3d3d;
+  --osss-bg-folder:       #2d3d30;
+  --osss-bg-folder-hover: #354739;
+  --osss-text-primary:    #e2e2e2;
+  --osss-text-btn:        #dddddd;
+  --osss-text-muted:      #9a9a9a;
+  --osss-text-detail:     #d0d0d0;
+  --osss-text-hint:       #a6a6a6;
+  --osss-border:          #4a4a4a;
+  --osss-border-pane:     #444444;
+  --osss-border-btn:      #555555;
+  --osss-border-submenu:  #5a5a5a;
+  --osss-accent:          #58a6ff;
+  --osss-shadow:          rgba(0, 0, 0, 0.35);
 }
 
 .osss-menu-root,
