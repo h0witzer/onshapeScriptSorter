@@ -13,6 +13,7 @@
   };
 
   let currentMenuClickListener = null;
+  let currentMenuContextMenuListener = null;
 
   async function getStoredTree() {
     if (typeof chrome !== "undefined" && chrome.storage?.local) {
@@ -236,6 +237,26 @@
     renderNodes(effectiveTree, menuRoot);
 
     dropdownContent.appendChild(menuRoot);
+
+    // Stop the contextmenu event from bubbling past dropdownContent once Onshape's own
+    // contextmenu handler (registered earlier on the same element) has run and shown its
+    // native context menu.  Without this, a parent-level listener hides the dropdown
+    // while the Onshape context-menu dialog floats without its backing folder structure.
+    // We only intercept events that originate inside our moved-tool elements.
+    if (currentMenuContextMenuListener) {
+      dropdownContent.removeEventListener("contextmenu", currentMenuContextMenuListener);
+    }
+    currentMenuContextMenuListener = (e) => {
+      if (!menuRoot.isConnected) {
+        dropdownContent.removeEventListener("contextmenu", currentMenuContextMenuListener);
+        currentMenuContextMenuListener = null;
+        return;
+      }
+      if (e.target.closest(".osss-moved-tool")) {
+        e.stopPropagation();
+      }
+    };
+    dropdownContent.addEventListener("contextmenu", currentMenuContextMenuListener);
 
     // Close all open submenus when the user clicks outside the menu.
     if (currentMenuClickListener) {
