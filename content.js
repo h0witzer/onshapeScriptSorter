@@ -14,6 +14,10 @@
 
   let currentMenuClickListener = null;
   let currentMenuMousedownListener = null;
+  // Tracks which folder node IDs the user has deliberately opened, so that the
+  // open state survives a full buildMenu re-render (which Onshape can trigger by
+  // hiding/recreating the dropdown element when showing its right-click dialog).
+  const openFolderIds = new Set();
 
   async function getStoredTree() {
     if (typeof chrome !== "undefined" && chrome.storage?.local) {
@@ -141,6 +145,14 @@
       }
     });
 
+    // Union any folder IDs that are currently open in the DOM into openFolderIds so
+    // that the open state survives a full re-render (Onshape can hide and recreate the
+    // dropdown element when showing its right-click dialog, causing a fresh buildMenu
+    // call on the new element which would otherwise lose all osss-open state).
+    dropdownContent.querySelectorAll(".osss-folder.osss-open[data-folder-id]").forEach((el) => {
+      openFolderIds.add(el.dataset.folderId);
+    });
+
     // Remove previous custom UI if any.
     dropdownContent.querySelectorAll(".osss-menu-root").forEach((n) => n.remove());
 
@@ -207,6 +219,7 @@
         } else if (node.type === "folder") {
           const folder = document.createElement("div");
           folder.className = "tool is-activatable is-button osss-menu-item osss-folder";
+          folder.dataset.folderId = node.id;
           folder.appendChild(createToolVisual(null, node.name || "Folder"));
 
           const submenu = document.createElement("div");
@@ -219,13 +232,18 @@
             const isOpen = folder.classList.contains("osss-open");
             // Close any sibling folders that are currently open.
             Array.from(container.children).forEach((child) => {
-              if (child !== folder) child.classList.remove("osss-open");
+              if (child !== folder) {
+                child.classList.remove("osss-open");
+                if (child.dataset.folderId) openFolderIds.delete(child.dataset.folderId);
+              }
             });
             if (isOpen) {
               folder.classList.remove("osss-open");
+              openFolderIds.delete(node.id);
             } else {
               chooseSubmenuDirection(folder, submenu);
               folder.classList.add("osss-open");
+              openFolderIds.add(node.id);
             }
           });
 
@@ -235,6 +253,21 @@
     };
 
     renderNodes(effectiveTree, menuRoot);
+
+    // Re-open any folders the user had previously opened.  This restores open state
+    // after a forced re-render (e.g. triggered by Onshape hiding/recreating the
+    // dropdown while showing its contextmenu dialog).  Stale IDs (from folders that
+    // have since been deleted from the tree) are pruned at this point.
+    openFolderIds.forEach((id) => {
+      const folderEl = menuRoot.querySelector(`.osss-folder[data-folder-id="${id}"]`);
+      if (folderEl) {
+        const submenuEl = folderEl.querySelector(".osss-submenu");
+        if (submenuEl) chooseSubmenuDirection(folderEl, submenuEl);
+        folderEl.classList.add("osss-open");
+      } else {
+        openFolderIds.delete(id);
+      }
+    });
 
     dropdownContent.appendChild(menuRoot);
 
@@ -274,7 +307,10 @@
         currentMenuClickListener = null;
         return;
       }
-      menuRoot.querySelectorAll(".osss-folder.osss-open").forEach((f) => f.classList.remove("osss-open"));
+      menuRoot.querySelectorAll(".osss-folder.osss-open").forEach((f) => {
+        if (f.dataset.folderId) openFolderIds.delete(f.dataset.folderId);
+        f.classList.remove("osss-open");
+      });
     };
     document.addEventListener("click", currentMenuClickListener);
   }
