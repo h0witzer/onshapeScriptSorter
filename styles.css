@@ -1,17 +1,52 @@
+/* --- Theme variables (light mode defaults — Onshape default) --- */
+:root {
+  --osss-bg-surface:      #ffffff;
+  --osss-bg-modal:        #f5f5f5;
+  --osss-bg-pane:         #fafafa;
+  --osss-bg-btn:          #ffffff;
+  --osss-bg-btn-hover:    #f0f0f0;
+  --osss-bg-hover:        #e8e8e8;
+  --osss-bg-folder:       #e8f4ea;
+  --osss-bg-folder-hover: #d4ecda;
+  --osss-text-primary:    #1a1a1a;
+  --osss-text-btn:        #333333;
+  --osss-text-muted:      #666666;
+  --osss-text-detail:     #333333;
+  --osss-text-hint:       #555555;
+  --osss-border:          #d0d0d0;
+  --osss-border-pane:     #e0e0e0;
+  --osss-border-btn:      #cccccc;
+  --osss-border-submenu:  #bbbbbb;
+  --osss-accent:          #0969da;
+  --osss-shadow:          rgba(0, 0, 0, 0.15);
+}
+
+/* --- Dark mode overrides — toggled by JS when Onshape's dark mode is active (#333333 bg) --- */
+.osss-dark {
+  --osss-bg-surface:      #333333;
+  --osss-bg-modal:        #2c2c2c;
+  --osss-bg-pane:         #303030;
+  --osss-bg-btn:          #3c3c3c;
+  --osss-bg-btn-hover:    #464646;
+  --osss-bg-hover:        #3d3d3d;
+  --osss-bg-folder:       #2d3d30;
+  --osss-bg-folder-hover: #354739;
+  --osss-text-primary:    #e2e2e2;
+  --osss-text-btn:        #dddddd;
+  --osss-text-muted:      #9a9a9a;
+  --osss-text-detail:     #d0d0d0;
+  --osss-text-hint:       #a6a6a6;
+  --osss-border:          #4a4a4a;
+  --osss-border-pane:     #444444;
+  --osss-border-btn:      #555555;
+  --osss-border-submenu:  #5a5a5a;
+  --osss-accent:          #58a6ff;
+  --osss-shadow:          rgba(0, 0, 0, 0.35);
+}
+
 .osss-menu-root,
 .osss-submenu {
   min-width: 230px;
-  overflow: visible;
-}
-
-.os-tool-dropdown,
-.os-tool-dropdown-content {
-  overflow: visible !important;
-}
-
-.custom-toolbar .tool.osss-folder,
-.osss-menu-root .osss-folder {
-  overflow: visible !important;
 }
 
 .osss-menu-item {
@@ -30,26 +65,16 @@
 
 .osss-submenu {
   display: none;
-  position: absolute;
-  top: 0;
-  left: 100%;
-  right: auto;
+  position: fixed;
   z-index: 10000;
-  border: 1px solid #6a6a6a;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+  background: var(--osss-bg-surface);
+  border: 1px solid var(--osss-border-submenu);
+  box-shadow: 0 6px 16px var(--osss-shadow);
+  max-height: 60vh;
+  overflow-y: auto;
 }
 
-.osss-folder.osss-open-left > .osss-submenu {
-  left: auto;
-  right: 100%;
-}
-
-.osss-folder.osss-open-right > .osss-submenu {
-  left: 100%;
-  right: auto;
-}
-
-.osss-menu-item.osss-folder:hover > .osss-submenu {
+.osss-menu-item.osss-folder.osss-open > .osss-submenu {
   display: block;
 }
 
@@ -70,9 +95,9 @@
   max-height: 95vh;
   display: flex;
   flex-direction: column;
-  background: #1f1f1f;
-  color: #e2e2e2;
-  border: 1px solid #3a3a3a;
+  background: var(--osss-bg-modal);
+  color: var(--osss-text-primary);
+  border: 1px solid var(--osss-border);
   border-radius: 8px;
   overflow: hidden;
   font-family: Arial, sans-serif;
@@ -80,7 +105,7 @@
 
 .osss-modal-header {
   padding: 12px 14px;
-  border-bottom: 1px solid #353535;
+  border-bottom: 1px solid var(--osss-border-pane);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -105,9 +130,9 @@
 }
 
 .osss-pane {
-  border: 1px solid #353535;
+  border: 1px solid var(--osss-border-pane);
   border-radius: 6px;
-  background: #222;
+  background: var(--osss-bg-pane);
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -115,7 +140,7 @@
 
 .osss-pane-header {
   padding: 8px 10px;
-  border-bottom: 1px solid #353535;
+  border-bottom: 1px solid var(--osss-border-pane);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -129,16 +154,16 @@
 }
 
 .osss-btn {
-  border: 1px solid #444;
-  background: #2a2a2a;
-  color: #ddd;
+  border: 1px solid var(--osss-border-btn);
+  background: var(--osss-bg-btn);
+  color: var(--osss-text-btn);
   padding: 6px 10px;
   border-radius: 5px;
   cursor: pointer;
   font-size: 12px;
 }
 
-.osss-btn:hover { background: #333; }
+.osss-btn:hover { background: var(--osss-bg-btn-hover); }
 
 .osss-tree,
 .osss-tree ul {
@@ -175,16 +200,16 @@
 .osss-node-row[draggable="true"] { cursor: grab; }
 .osss-node-row:active { cursor: grabbing; }
 
-.osss-node-row:hover { background: #2c2c2c; }
-.osss-node-row.osss-drop-target { outline: 1px solid #58a6ff; }
-.osss-node-row.osss-selected { outline: 1px solid #58a6ff; }
+.osss-node-row:hover { background: var(--osss-bg-hover); }
+.osss-node-row.osss-drop-target { outline: 1px solid var(--osss-accent); }
+.osss-node-row.osss-selected { outline: 1px solid var(--osss-accent); }
 
 .osss-node-row-folder {
-  background: #2b3a2e;
+  background: var(--osss-bg-folder);
 }
 
 .osss-node-row-folder:hover {
-  background: #334739;
+  background: var(--osss-bg-folder-hover);
 }
 
 .osss-node-left {
@@ -224,7 +249,7 @@
 }
 
 .osss-detail-empty {
-  color: #9a9a9a;
+  color: var(--osss-text-muted);
   font-size: 12px;
 }
 
@@ -234,7 +259,7 @@
 
 .osss-detail-row {
   font-size: 12px;
-  color: #d0d0d0;
+  color: var(--osss-text-detail);
   margin-bottom: 8px;
   line-height: 1.35;
 }
@@ -249,7 +274,7 @@
 }
 
 .osss-hint {
-  color: #a6a6a6;
+  color: var(--osss-text-hint);
   font-size: 12px;
   margin-bottom: 10px;
 }

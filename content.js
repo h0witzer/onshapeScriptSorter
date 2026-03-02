@@ -1,5 +1,9 @@
 (() => {
   const STORAGE_KEY = "onshapeScriptSorter.tree.v1";
+  // Onshape's dark mode sets this color (#333333) as the body background.
+  const ONSHAPE_DARK_BG = "rgb(51, 51, 51)";
+  // Gap in pixels between the submenu edge and the viewport boundary.
+  const SUBMENU_VIEWPORT_MARGIN = 8;
 
   const state = {
     lastSignature: "",
@@ -7,6 +11,8 @@
     observer: null,
     rerenderTimer: null
   };
+
+  let currentMenuClickListener = null;
 
   async function getStoredTree() {
     if (typeof chrome !== "undefined" && chrome.storage?.local) {
@@ -115,6 +121,11 @@
     return base;
   }
 
+  function isOnshapeDarkMode() {
+    // Onshape's dark mode applies #333333 (rgb(51,51,51)) as the body background.
+    return getComputedStyle(document.body).backgroundColor === ONSHAPE_DARK_BG;
+  }
+
   function buildMenu(dropdownContent, effectiveTree, currentTools) {
     // Remove previous custom UI if any.
     dropdownContent.querySelectorAll(".osss-menu-root").forEach((n) => n.remove());
@@ -127,6 +138,7 @@
 
     const menuRoot = document.createElement("div");
     menuRoot.className = "osss-menu-root";
+    menuRoot.classList.toggle("osss-dark", isOnshapeDarkMode());
 
     const createToolVisual = (tool, fallbackTitle) => {
       const frag = document.createDocumentFragment();
@@ -145,31 +157,31 @@
     };
 
     const chooseSubmenuDirection = (folderEl, submenuEl) => {
-      const prevDisplay = submenuEl.style.display;
-      const prevVisibility = submenuEl.style.visibility;
-      const prevLeft = submenuEl.style.left;
-      const prevRight = submenuEl.style.right;
+      const folderRect = folderEl.getBoundingClientRect();
 
+      // Temporarily show to measure the submenu dimensions.
       submenuEl.style.visibility = "hidden";
       submenuEl.style.display = "block";
-      submenuEl.style.left = "100%";
-      submenuEl.style.right = "auto";
+      const submenuRect = submenuEl.getBoundingClientRect();
+      const submenuWidth = submenuRect.width || 230;
+      const submenuHeight = submenuRect.height || 0;
+      submenuEl.style.display = "";
+      submenuEl.style.visibility = "";
 
-      const submenuWidth = submenuEl.getBoundingClientRect().width || 230;
-      const folderRect = folderEl.getBoundingClientRect();
       const spaceRight = window.innerWidth - folderRect.right;
       const spaceLeft = folderRect.left;
 
-      submenuEl.style.display = prevDisplay;
-      submenuEl.style.visibility = prevVisibility;
-      submenuEl.style.left = prevLeft;
-      submenuEl.style.right = prevRight;
+      // Align submenu top with the folder row, but clamp so it doesn't overflow below the viewport.
+      const rawTop = folderRect.top;
+      const maxTop = window.innerHeight - submenuHeight - SUBMENU_VIEWPORT_MARGIN;
+      submenuEl.style.top = Math.max(0, Math.min(rawTop, maxTop)) + "px";
 
-      folderEl.classList.remove("osss-open-left", "osss-open-right");
       if (spaceRight < submenuWidth && spaceLeft > spaceRight) {
-        folderEl.classList.add("osss-open-left");
+        submenuEl.style.left = "auto";
+        submenuEl.style.right = (window.innerWidth - folderRect.left) + "px";
       } else {
-        folderEl.classList.add("osss-open-right");
+        submenuEl.style.left = folderRect.right + "px";
+        submenuEl.style.right = "auto";
       }
     };
 
@@ -184,6 +196,7 @@
           item.appendChild(createToolVisual(tool, tool.title));
           item.addEventListener("click", (e) => {
             e.stopPropagation();
+            menuRoot.querySelectorAll(".osss-folder.osss-open").forEach((f) => f.classList.remove("osss-open"));
             tool.el.click();
           });
           container.appendChild(item);
@@ -197,8 +210,19 @@
           renderNodes(node.children || [], submenu);
           folder.appendChild(submenu);
 
-          folder.addEventListener("mouseenter", () => {
-            chooseSubmenuDirection(folder, submenu);
+          folder.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const isOpen = folder.classList.contains("osss-open");
+            // Close any sibling folders that are currently open.
+            Array.from(container.children).forEach((child) => {
+              if (child !== folder) child.classList.remove("osss-open");
+            });
+            if (isOpen) {
+              folder.classList.remove("osss-open");
+            } else {
+              chooseSubmenuDirection(folder, submenu);
+              folder.classList.add("osss-open");
+            }
           });
 
           container.appendChild(folder);
@@ -208,6 +232,20 @@
 
     renderNodes(effectiveTree, menuRoot);
     dropdownContent.appendChild(menuRoot);
+
+    // Close all open submenus when the user clicks outside the menu.
+    if (currentMenuClickListener) {
+      document.removeEventListener("click", currentMenuClickListener);
+    }
+    currentMenuClickListener = () => {
+      if (!menuRoot.isConnected) {
+        document.removeEventListener("click", currentMenuClickListener);
+        currentMenuClickListener = null;
+        return;
+      }
+      menuRoot.querySelectorAll(".osss-folder.osss-open").forEach((f) => f.classList.remove("osss-open"));
+    };
+    document.addEventListener("click", currentMenuClickListener);
   }
 
   function deepClone(obj) {
@@ -256,6 +294,7 @@
 
     const backdrop = document.createElement("div");
     backdrop.className = "osss-modal-backdrop";
+    backdrop.classList.toggle("osss-dark", isOnshapeDarkMode());
 
     const modal = document.createElement("div");
     modal.className = "osss-modal";
@@ -810,6 +849,17 @@
   function init() {
     findAndProcess();
     startObserver();
+
+    // Re-theme extension UI whenever Onshape's own dark/light mode changes.
+    let _lastDark = isOnshapeDarkMode();
+    new MutationObserver(() => {
+      const dark = isOnshapeDarkMode();
+      if (dark === _lastDark) return;
+      _lastDark = dark;
+      document.querySelectorAll(".osss-menu-root, .osss-modal-backdrop").forEach((el) => {
+        el.classList.toggle("osss-dark", dark);
+      });
+    }).observe(document.body, { attributes: true, attributeFilter: ["class", "style"] });
 
     if (typeof chrome !== "undefined" && chrome.runtime?.onMessage) {
       chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
