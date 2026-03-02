@@ -1,48 +1,48 @@
-/* --- Theme variables (dark mode defaults) --- */
+/* --- Theme variables (light mode defaults — Onshape default) --- */
 :root {
-  --osss-bg-surface:      #2b2b2b;
-  --osss-bg-modal:        #1f1f1f;
-  --osss-bg-pane:         #222222;
-  --osss-bg-btn:          #2a2a2a;
-  --osss-bg-btn-hover:    #333333;
-  --osss-bg-hover:        #2c2c2c;
-  --osss-bg-folder:       #2b3a2e;
-  --osss-bg-folder-hover: #334739;
-  --osss-text-primary:    #e2e2e2;
-  --osss-text-btn:        #dddddd;
-  --osss-text-muted:      #9a9a9a;
-  --osss-text-detail:     #d0d0d0;
-  --osss-text-hint:       #a6a6a6;
-  --osss-border:          #3a3a3a;
-  --osss-border-pane:     #353535;
-  --osss-border-btn:      #444444;
-  --osss-border-submenu:  #6a6a6a;
-  --osss-accent:          #58a6ff;
-  --osss-shadow:          rgba(0, 0, 0, 0.35);
+  --osss-bg-surface:      #ffffff;
+  --osss-bg-modal:        #f5f5f5;
+  --osss-bg-pane:         #fafafa;
+  --osss-bg-btn:          #ffffff;
+  --osss-bg-btn-hover:    #f0f0f0;
+  --osss-bg-hover:        #e8e8e8;
+  --osss-bg-folder:       #e8f4ea;
+  --osss-bg-folder-hover: #d4ecda;
+  --osss-text-primary:    #1a1a1a;
+  --osss-text-btn:        #333333;
+  --osss-text-muted:      #666666;
+  --osss-text-detail:     #333333;
+  --osss-text-hint:       #555555;
+  --osss-border:          #d0d0d0;
+  --osss-border-pane:     #e0e0e0;
+  --osss-border-btn:      #cccccc;
+  --osss-border-submenu:  #bbbbbb;
+  --osss-accent:          #0969da;
+  --osss-shadow:          rgba(0, 0, 0, 0.15);
 }
 
-/* --- Light mode overrides --- */
-@media (prefers-color-scheme: light) {
+/* --- Dark mode overrides — Onshape dark mode background is #333333 --- */
+@media (prefers-color-scheme: dark) {
   :root {
-    --osss-bg-surface:      #ffffff;
-    --osss-bg-modal:        #f5f5f5;
-    --osss-bg-pane:         #fafafa;
-    --osss-bg-btn:          #ffffff;
-    --osss-bg-btn-hover:    #f0f0f0;
-    --osss-bg-hover:        #e8e8e8;
-    --osss-bg-folder:       #e8f4ea;
-    --osss-bg-folder-hover: #d4ecda;
-    --osss-text-primary:    #1a1a1a;
-    --osss-text-btn:        #333333;
-    --osss-text-muted:      #666666;
-    --osss-text-detail:     #333333;
-    --osss-text-hint:       #555555;
-    --osss-border:          #d0d0d0;
-    --osss-border-pane:     #e0e0e0;
-    --osss-border-btn:      #cccccc;
-    --osss-border-submenu:  #bbbbbb;
-    --osss-accent:          #0969da;
-    --osss-shadow:          rgba(0, 0, 0, 0.15);
+    --osss-bg-surface:      #333333;
+    --osss-bg-modal:        #2c2c2c;
+    --osss-bg-pane:         #303030;
+    --osss-bg-btn:          #3c3c3c;
+    --osss-bg-btn-hover:    #464646;
+    --osss-bg-hover:        #3d3d3d;
+    --osss-bg-folder:       #2d3d30;
+    --osss-bg-folder-hover: #354739;
+    --osss-text-primary:    #e2e2e2;
+    --osss-text-btn:        #dddddd;
+    --osss-text-muted:      #9a9a9a;
+    --osss-text-detail:     #d0d0d0;
+    --osss-text-hint:       #a6a6a6;
+    --osss-border:          #4a4a4a;
+    --osss-border-pane:     #444444;
+    --osss-border-btn:      #555555;
+    --osss-border-submenu:  #5a5a5a;
+    --osss-accent:          #58a6ff;
+    --osss-shadow:          rgba(0, 0, 0, 0.35);
   }
 }
 
