@@ -317,8 +317,11 @@
                 <button type="button" class="osss-btn" data-action="add-folder">New</button>
                 <button type="button" class="osss-btn" data-action="rename-folder">Rename</button>
                 <button type="button" class="osss-btn" data-action="delete-folder">Delete</button>
+                <button type="button" class="osss-btn" data-action="export-folder">Export</button>
+                <button type="button" class="osss-btn" data-action="import-folder">Import</button>
               </div>
             </div>
+            <input type="file" data-role="import-file-input" accept=".json" style="display:none">
             <div class="osss-tree-root">
               <ul class="osss-tree" data-root="true"></ul>
             </div>
@@ -737,6 +740,119 @@
       selectedFolderId = ctx.parentFolderId || ROOT_ID;
       showAllTools = false;
       rerenderAll();
+    });
+
+    function exportFolderSubtree(node) {
+      if (node.type === "tool") {
+        return { type: "tool", id: node.id };
+      }
+      return {
+        type: "folder",
+        name: node.name || "Folder",
+        children: (node.children || []).map(exportFolderSubtree)
+      };
+    }
+
+    modal.querySelector('[data-action="export-folder"]').addEventListener("click", () => {
+      let exportData;
+      if (selectedFolderId === ROOT_ID) {
+        exportData = {
+          version: "1",
+          type: "osss-folder-pack",
+          folders: workingTree.filter((n) => n.type === "folder").map(exportFolderSubtree)
+        };
+      } else {
+        const folder = getFolderById(workingTree, selectedFolderId);
+        if (!folder || folder.type !== "folder") return;
+        exportData = {
+          version: "1",
+          type: "osss-folder-pack",
+          folders: [exportFolderSubtree(folder)]
+        };
+      }
+
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "osss-folder-pack.json";
+      document.body.appendChild(a);
+      try {
+        a.click();
+      } finally {
+        a.remove();
+        URL.revokeObjectURL(url);
+      }
+    });
+
+    function importFolderSubtree(node) {
+      if (!node || typeof node !== "object") return null;
+      if (node.type === "tool" && node.id) {
+        return { type: "tool", id: node.id };
+      }
+      if (node.type === "folder") {
+        return {
+          type: "folder",
+          id: getNextFolderId(),
+          name: node.name || "Imported Folder",
+          children: (Array.isArray(node.children) ? node.children : [])
+            .map(importFolderSubtree)
+            .filter(Boolean)
+        };
+      }
+      return null;
+    }
+
+    const importFileInput = modal.querySelector('[data-role="import-file-input"]');
+    modal.querySelector('[data-action="import-folder"]').addEventListener("click", () => {
+      importFileInput.value = "";
+      importFileInput.click();
+    });
+
+    importFileInput.addEventListener("change", () => {
+      const file = importFileInput.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onerror = () => {
+        alert("Failed to read the file.");
+      };
+      reader.onload = (e) => {
+        let parsed;
+        try {
+          parsed = JSON.parse(e.target.result);
+        } catch {
+          alert("Invalid JSON file.");
+          return;
+        }
+
+        if (
+          !parsed ||
+          parsed.type !== "osss-folder-pack" ||
+          !Array.isArray(parsed.folders) ||
+          !parsed.folders.length
+        ) {
+          alert("Not a valid folder pack file.");
+          return;
+        }
+
+        const imported = parsed.folders.map(importFolderSubtree).filter(Boolean);
+
+        if (selectedFolderId === ROOT_ID) {
+          workingTree.push(...imported);
+        } else {
+          const targetFolder = getFolderById(workingTree, selectedFolderId);
+          if (targetFolder && targetFolder.type === "folder") {
+            targetFolder.children = targetFolder.children || [];
+            targetFolder.children.push(...imported);
+          } else {
+            workingTree.push(...imported);
+          }
+        }
+
+        rerenderAll();
+      };
+      reader.readAsText(file);
     });
 
     filterBtn.addEventListener("click", () => {
