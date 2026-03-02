@@ -60,12 +60,15 @@
     );
 
     allToolEls.forEach((el) => {
-      if (el.classList.contains("osss-ignore")) return;
       const title = (el.getAttribute("data-bs-original-title") || "").trim();
       if (!title) return;
 
       const commandId = el.getAttribute("command-id") || "";
       const details = el.getAttribute("context-menu-details") || "";
+      // Skip action buttons (Sort custom features, Update all, etc.) that carry an
+      // empty context-menu-details attribute — only actual custom-feature scripts have
+      // a meaningful value here.
+      if (!details) return;
       const dataId = el.getAttribute("data-id") || "";
       const id = details || `${commandId}::${title}::${dataId}`;
 
@@ -127,15 +130,18 @@
   }
 
   function buildMenu(dropdownContent, effectiveTree, currentTools) {
+    // Restore any previously moved tool elements back to the dropdown so they are
+    // available for re-ordering and so Onshape can manage their lifecycle normally.
+    // Guard with isConnected in case Onshape already removed the element from the DOM.
+    dropdownContent.querySelectorAll(".osss-moved-tool").forEach((el) => {
+      el.classList.remove("osss-moved-tool");
+      if (el.isConnected) {
+        dropdownContent.appendChild(el);
+      }
+    });
+
     // Remove previous custom UI if any.
     dropdownContent.querySelectorAll(".osss-menu-root").forEach((n) => n.remove());
-
-    for (const [, tool] of currentTools) {
-      if (tool.el) {
-        tool.el.classList.add("osss-ignore");
-        tool.el.style.display = "none";
-      }
-    }
 
     const menuRoot = document.createElement("div");
     menuRoot.className = "osss-menu-root";
@@ -192,15 +198,11 @@
           const tool = currentTools.get(node.id);
           if (!tool) continue;
 
-          const item = document.createElement("div");
-          item.className = "tool is-activatable is-button osss-menu-item";
-          item.appendChild(createToolVisual(tool, tool.title));
-          item.addEventListener("click", (e) => {
-            e.stopPropagation();
-            menuRoot.querySelectorAll(".osss-folder.osss-open").forEach((f) => f.classList.remove("osss-open"));
-            tool.el.click();
-          });
-          container.appendChild(item);
+          // Move the real Onshape element into our folder structure so that all
+          // native event handlers (click, contextmenu, keyboard, etc.) remain
+          // connected and behave exactly as Onshape intended.
+          tool.el.classList.add("osss-moved-tool");
+          container.appendChild(tool.el);
         } else if (node.type === "folder") {
           const folder = document.createElement("div");
           folder.className = "tool is-activatable is-button osss-menu-item osss-folder";
@@ -232,6 +234,19 @@
     };
 
     renderNodes(effectiveTree, menuRoot);
+
+    // Prevent right-click (contextmenu) events originating from a moved tool element
+    // from bubbling up to Onshape's dropdown dismissal logic.  The event still fires
+    // on the real tool.el first (showing Onshape's native Update/Remove/… context
+    // menu) before being caught here and stopped.  We only stop propagation when the
+    // event came from a tool — right-clicks on folder rows or empty areas are left to
+    // bubble normally.
+    menuRoot.addEventListener("contextmenu", (e) => {
+      if (e.target.closest(".osss-moved-tool")) {
+        e.stopPropagation();
+      }
+    });
+
     dropdownContent.appendChild(menuRoot);
 
     // Close all open submenus when the user clicks outside the menu.
