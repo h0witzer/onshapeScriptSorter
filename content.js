@@ -753,14 +753,21 @@
       };
     }
 
+    function folderNameToFilename(name) {
+      const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+      return "osss-" + (slug || "folder") + ".json";
+    }
+
     modal.querySelector('[data-action="export-folder"]').addEventListener("click", () => {
       let exportData;
+      let filename;
       if (selectedFolderId === ROOT_ID) {
         exportData = {
           version: "1",
           type: "osss-folder-pack",
           folders: workingTree.filter((n) => n.type === "folder").map(exportFolderSubtree)
         };
+        filename = "osss-all-folders.json";
       } else {
         const folder = getFolderById(workingTree, selectedFolderId);
         if (!folder || folder.type !== "folder") return;
@@ -769,13 +776,14 @@
           type: "osss-folder-pack",
           folders: [exportFolderSubtree(folder)]
         };
+        filename = folderNameToFilename(folder.name || "folder");
       }
 
       const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "osss-folder-pack.json";
+      a.download = filename;
       document.body.appendChild(a);
       try {
         a.click();
@@ -809,6 +817,70 @@
       importFileInput.click();
     });
 
+    function mergeFolderChildren(existingFolder, incomingFolder) {
+      existingFolder.children = existingFolder.children || [];
+      for (const child of incomingFolder.children || []) {
+        if (child.type === "tool") {
+          const alreadyPresent = existingFolder.children.some(
+            (c) => c.type === "tool" && c.id === child.id
+          );
+          if (!alreadyPresent) existingFolder.children.push({ type: "tool", id: child.id });
+        } else if (child.type === "folder") {
+          const matchingSub = existingFolder.children.find(
+            (c) => c.type === "folder" && c.name === child.name
+          );
+          if (matchingSub) {
+            mergeFolderChildren(matchingSub, child);
+          } else {
+            existingFolder.children.push(importFolderSubtree(child));
+          }
+        }
+      }
+    }
+
+    function resolveImportConflicts(incoming, targetChildren) {
+      const decisions = new Map();
+      for (const folder of incoming) {
+        if (folder.type !== "folder") continue;
+        const existing = targetChildren.find(
+          (c) => c.type === "folder" && c.name === folder.name
+        );
+        if (!existing) continue;
+
+        const choice = prompt(
+          `A folder named "${folder.name}" already exists here.\n\nChoose an action:\n  merge   – combine contents (keep both)\n  replace – overwrite existing folder\n  skip    – do not import this folder\n\nType merge, replace, or skip:`,
+          "merge"
+        );
+
+        decisions.set(folder, (choice || "skip").trim().toLowerCase());
+      }
+      return decisions;
+    }
+
+    function applyImportedFolders(incoming, targetChildren, decisions) {
+      for (const folder of incoming) {
+        if (folder.type !== "folder") {
+          targetChildren.push(folder);
+          continue;
+        }
+
+        const existingIdx = targetChildren.findIndex(
+          (c) => c.type === "folder" && c.name === folder.name
+        );
+        const action = decisions.get(folder);
+
+        if (existingIdx === -1 || action === undefined) {
+          targetChildren.push(folder);
+        } else if (action === "replace") {
+          folder.id = getNextFolderId();
+          targetChildren.splice(existingIdx, 1, folder);
+        } else if (action === "merge") {
+          mergeFolderChildren(targetChildren[existingIdx], folder);
+        }
+        // "skip" — do nothing
+      }
+    }
+
     importFileInput.addEventListener("change", () => {
       const file = importFileInput.files?.[0];
       if (!file) return;
@@ -838,17 +910,21 @@
 
         const imported = parsed.folders.map(importFolderSubtree).filter(Boolean);
 
+        let targetChildren;
         if (selectedFolderId === ROOT_ID) {
-          workingTree.push(...imported);
+          targetChildren = workingTree;
         } else {
           const targetFolder = getFolderById(workingTree, selectedFolderId);
           if (targetFolder && targetFolder.type === "folder") {
             targetFolder.children = targetFolder.children || [];
-            targetFolder.children.push(...imported);
+            targetChildren = targetFolder.children;
           } else {
-            workingTree.push(...imported);
+            targetChildren = workingTree;
           }
         }
+
+        const decisions = resolveImportConflicts(imported, targetChildren);
+        applyImportedFolders(imported, targetChildren, decisions);
 
         rerenderAll();
       };
