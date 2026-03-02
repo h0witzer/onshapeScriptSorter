@@ -207,9 +207,28 @@
           renderNodes(node.children || [], submenu);
           folder.appendChild(submenu);
 
-          folder.addEventListener("mouseenter", () => {
+          let hideTimer = null;
+
+          const openSubmenu = () => {
+            clearTimeout(hideTimer);
             chooseSubmenuDirection(folder, submenu);
+            folder.classList.add("osss-open");
+          };
+
+          const scheduleClose = () => {
+            clearTimeout(hideTimer);
+            hideTimer = setTimeout(() => {
+              folder.classList.remove("osss-open");
+            }, 150);
+          };
+
+          folder.addEventListener("mouseenter", openSubmenu);
+          folder.addEventListener("mouseleave", scheduleClose);
+          submenu.addEventListener("mouseenter", () => {
+            clearTimeout(hideTimer);
+            folder.classList.add("osss-open");
           });
+          submenu.addEventListener("mouseleave", scheduleClose);
 
           container.appendChild(folder);
         }
