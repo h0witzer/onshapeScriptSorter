@@ -56,7 +56,7 @@
     const map = new Map();
 
     const allToolEls = dropdownContent.querySelectorAll(
-      ".tool.is-activatable.is-button[data-bs-original-title]"
+      ".tool.is-activatable.is-button[data-bs-original-title][context-menu-details]"
     );
 
     allToolEls.forEach((el) => {
@@ -130,11 +130,12 @@
     // Remove previous custom UI if any.
     dropdownContent.querySelectorAll(".osss-menu-root").forEach((n) => n.remove());
 
-    const originalTools = dropdownContent.querySelectorAll(".tool.is-activatable.is-button");
-    originalTools.forEach((el) => {
-      el.classList.add("osss-ignore");
-      el.style.display = "none";
-    });
+    for (const [, tool] of currentTools) {
+      if (tool.el) {
+        tool.el.classList.add("osss-ignore");
+        tool.el.style.display = "none";
+      }
+    }
 
     const menuRoot = document.createElement("div");
     menuRoot.className = "osss-menu-root";
