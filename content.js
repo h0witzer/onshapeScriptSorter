@@ -12,6 +12,8 @@
     rerenderTimer: null
   };
 
+  let currentMenuClickListener = null;
+
   async function getStoredTree() {
     if (typeof chrome !== "undefined" && chrome.storage?.local) {
       try {
@@ -194,6 +196,7 @@
           item.appendChild(createToolVisual(tool, tool.title));
           item.addEventListener("click", (e) => {
             e.stopPropagation();
+            menuRoot.querySelectorAll(".osss-folder.osss-open").forEach((f) => f.classList.remove("osss-open"));
             tool.el.click();
           });
           container.appendChild(item);
@@ -207,28 +210,20 @@
           renderNodes(node.children || [], submenu);
           folder.appendChild(submenu);
 
-          let hideTimer = null;
-
-          const openSubmenu = () => {
-            clearTimeout(hideTimer);
-            chooseSubmenuDirection(folder, submenu);
-            folder.classList.add("osss-open");
-          };
-
-          const scheduleClose = () => {
-            clearTimeout(hideTimer);
-            hideTimer = setTimeout(() => {
+          folder.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const isOpen = folder.classList.contains("osss-open");
+            // Close any sibling folders that are currently open.
+            Array.from(container.children).forEach((child) => {
+              if (child !== folder) child.classList.remove("osss-open");
+            });
+            if (isOpen) {
               folder.classList.remove("osss-open");
-            }, 150);
-          };
-
-          folder.addEventListener("mouseenter", openSubmenu);
-          folder.addEventListener("mouseleave", scheduleClose);
-          submenu.addEventListener("mouseenter", () => {
-            clearTimeout(hideTimer);
-            folder.classList.add("osss-open");
+            } else {
+              chooseSubmenuDirection(folder, submenu);
+              folder.classList.add("osss-open");
+            }
           });
-          submenu.addEventListener("mouseleave", scheduleClose);
 
           container.appendChild(folder);
         }
@@ -237,6 +232,20 @@
 
     renderNodes(effectiveTree, menuRoot);
     dropdownContent.appendChild(menuRoot);
+
+    // Close all open submenus when the user clicks outside the menu.
+    if (currentMenuClickListener) {
+      document.removeEventListener("click", currentMenuClickListener);
+    }
+    currentMenuClickListener = () => {
+      if (!menuRoot.isConnected) {
+        document.removeEventListener("click", currentMenuClickListener);
+        currentMenuClickListener = null;
+        return;
+      }
+      menuRoot.querySelectorAll(".osss-folder.osss-open").forEach((f) => f.classList.remove("osss-open"));
+    };
+    document.addEventListener("click", currentMenuClickListener);
   }
 
   function deepClone(obj) {
