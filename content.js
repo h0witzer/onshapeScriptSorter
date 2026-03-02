@@ -2,6 +2,8 @@
   const STORAGE_KEY = "onshapeScriptSorter.tree.v1";
   // Onshape's dark mode sets this color (#333333) as the body background.
   const ONSHAPE_DARK_BG = "rgb(51, 51, 51)";
+  // Gap in pixels between the submenu edge and the viewport boundary.
+  const SUBMENU_VIEWPORT_MARGIN = 8;
 
   const state = {
     lastSignature: "",
@@ -155,17 +157,22 @@
     const chooseSubmenuDirection = (folderEl, submenuEl) => {
       const folderRect = folderEl.getBoundingClientRect();
 
-      // Temporarily show to measure the submenu width.
+      // Temporarily show to measure the submenu dimensions.
       submenuEl.style.visibility = "hidden";
       submenuEl.style.display = "block";
-      const submenuWidth = submenuEl.getBoundingClientRect().width || 230;
+      const submenuRect = submenuEl.getBoundingClientRect();
+      const submenuWidth = submenuRect.width || 230;
+      const submenuHeight = submenuRect.height || 0;
       submenuEl.style.display = "";
       submenuEl.style.visibility = "";
 
       const spaceRight = window.innerWidth - folderRect.right;
       const spaceLeft = folderRect.left;
 
-      submenuEl.style.top = folderRect.top + "px";
+      // Align submenu top with the folder row, but clamp so it doesn't overflow below the viewport.
+      const rawTop = folderRect.top;
+      const maxTop = window.innerHeight - submenuHeight - SUBMENU_VIEWPORT_MARGIN;
+      submenuEl.style.top = Math.max(0, Math.min(rawTop, maxTop)) + "px";
 
       if (spaceRight < submenuWidth && spaceLeft > spaceRight) {
         submenuEl.style.left = "auto";
