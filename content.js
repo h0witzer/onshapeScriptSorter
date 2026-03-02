@@ -13,6 +13,17 @@
   };
 
   let currentMenuClickListener = null;
+  let currentMenuMousedownListener = null;
+  // Tracks which folder node IDs the user has deliberately opened, so that the
+  // open state survives a full buildMenu re-render (which Onshape can trigger by
+  // hiding/recreating the dropdown element when showing its right-click dialog).
+  const openFolderIds = new Set();
+  // Set to true when a contextmenu event fires on an osss-moved-tool element.
+  // Onshape's contextmenu handler can dispatch a synthetic click to close other
+  // popups before showing its Update/Remove dialog; that synthetic click would
+  // otherwise trigger our document click listener and collapse open subfolders.
+  // The flag tells the document click listener to skip one cycle in that case.
+  let pendingRightClickInMenu = false;
 
   async function getStoredTree() {
     if (typeof chrome !== "undefined" && chrome.storage?.local) {
@@ -56,16 +67,19 @@
     const map = new Map();
 
     const allToolEls = dropdownContent.querySelectorAll(
-      ".tool.is-activatable.is-button[data-bs-original-title]"
+      ".tool.is-activatable.is-button[data-bs-original-title][context-menu-details]"
     );
 
     allToolEls.forEach((el) => {
-      if (el.classList.contains("osss-ignore")) return;
       const title = (el.getAttribute("data-bs-original-title") || "").trim();
       if (!title) return;
 
       const commandId = el.getAttribute("command-id") || "";
       const details = el.getAttribute("context-menu-details") || "";
+      // Skip action buttons (Sort custom features, Update all, etc.) that carry an
+      // empty context-menu-details attribute — only actual custom-feature scripts have
+      // a meaningful value here.
+      if (!details) return;
       const dataId = el.getAttribute("data-id") || "";
       const id = details || `${commandId}::${title}::${dataId}`;
 
@@ -127,14 +141,26 @@
   }
 
   function buildMenu(dropdownContent, effectiveTree, currentTools) {
+    // Restore any previously moved tool elements back to the dropdown so they are
+    // available for re-ordering and so Onshape can manage their lifecycle normally.
+    // Guard with isConnected in case Onshape already removed the element from the DOM.
+    dropdownContent.querySelectorAll(".osss-moved-tool").forEach((el) => {
+      el.classList.remove("osss-moved-tool");
+      if (el.isConnected) {
+        dropdownContent.appendChild(el);
+      }
+    });
+
+    // Union any folder IDs that are currently open in the DOM into openFolderIds so
+    // that the open state survives a full re-render (Onshape can hide and recreate the
+    // dropdown element when showing its right-click dialog, causing a fresh buildMenu
+    // call on the new element which would otherwise lose all osss-open state).
+    dropdownContent.querySelectorAll(".osss-folder.osss-open[data-folder-id]").forEach((el) => {
+      openFolderIds.add(el.dataset.folderId);
+    });
+
     // Remove previous custom UI if any.
     dropdownContent.querySelectorAll(".osss-menu-root").forEach((n) => n.remove());
-
-    const originalTools = dropdownContent.querySelectorAll(".tool.is-activatable.is-button");
-    originalTools.forEach((el) => {
-      el.classList.add("osss-ignore");
-      el.style.display = "none";
-    });
 
     const menuRoot = document.createElement("div");
     menuRoot.className = "osss-menu-root";
@@ -191,18 +217,15 @@
           const tool = currentTools.get(node.id);
           if (!tool) continue;
 
-          const item = document.createElement("div");
-          item.className = "tool is-activatable is-button osss-menu-item";
-          item.appendChild(createToolVisual(tool, tool.title));
-          item.addEventListener("click", (e) => {
-            e.stopPropagation();
-            menuRoot.querySelectorAll(".osss-folder.osss-open").forEach((f) => f.classList.remove("osss-open"));
-            tool.el.click();
-          });
-          container.appendChild(item);
+          // Move the real Onshape element into our folder structure so that all
+          // native event handlers (click, contextmenu, keyboard, etc.) remain
+          // connected and behave exactly as Onshape intended.
+          tool.el.classList.add("osss-moved-tool");
+          container.appendChild(tool.el);
         } else if (node.type === "folder") {
           const folder = document.createElement("div");
           folder.className = "tool is-activatable is-button osss-menu-item osss-folder";
+          folder.dataset.folderId = node.id;
           folder.appendChild(createToolVisual(null, node.name || "Folder"));
 
           const submenu = document.createElement("div");
@@ -215,13 +238,18 @@
             const isOpen = folder.classList.contains("osss-open");
             // Close any sibling folders that are currently open.
             Array.from(container.children).forEach((child) => {
-              if (child !== folder) child.classList.remove("osss-open");
+              if (child !== folder) {
+                child.classList.remove("osss-open");
+                if (child.dataset.folderId) openFolderIds.delete(child.dataset.folderId);
+              }
             });
             if (isOpen) {
               folder.classList.remove("osss-open");
+              openFolderIds.delete(node.id);
             } else {
               chooseSubmenuDirection(folder, submenu);
               folder.classList.add("osss-open");
+              openFolderIds.add(node.id);
             }
           });
 
@@ -231,19 +259,82 @@
     };
 
     renderNodes(effectiveTree, menuRoot);
+
+    // Re-open any folders the user had previously opened.  This restores open state
+    // after a forced re-render (e.g. triggered by Onshape hiding/recreating the
+    // dropdown while showing its contextmenu dialog).  Stale IDs (from folders that
+    // have since been deleted from the tree) are pruned at this point.
+    openFolderIds.forEach((id) => {
+      const folderEl = menuRoot.querySelector(`.osss-folder[data-folder-id="${id}"]`);
+      if (folderEl) {
+        const submenuEl = folderEl.querySelector(".osss-submenu");
+        if (submenuEl) chooseSubmenuDirection(folderEl, submenuEl);
+        folderEl.classList.add("osss-open");
+      } else {
+        openFolderIds.delete(id);
+      }
+    });
+
     dropdownContent.appendChild(menuRoot);
+
+    // When the user right-clicks a tool inside one of our folders the browser fires
+    // mousedown (button=2) → mouseup → contextmenu in sequence.  Onshape's own
+    // contextmenu handler lives on a parent element above dropdownContent and correctly
+    // calls preventDefault() + shows its Update/Remove dialog.  However, a separate
+    // document-level mousedown listener (Bootstrap / Onshape dropdown management) also
+    // fires and collapses the dropdown before contextmenu even arrives.
+    //
+    // Fix: stop right-click mousedown from bubbling past dropdownContent for events
+    // that originate inside our moved-tool elements.  This prevents the dropdown-close
+    // handler on document from running while leaving the contextmenu event completely
+    // free to bubble up to Onshape's own handler.
+    if (currentMenuMousedownListener) {
+      dropdownContent.removeEventListener("mousedown", currentMenuMousedownListener);
+    }
+    currentMenuMousedownListener = (e) => {
+      if (!menuRoot.isConnected) {
+        dropdownContent.removeEventListener("mousedown", currentMenuMousedownListener);
+        currentMenuMousedownListener = null;
+        return;
+      }
+      if (e.button === 2 && e.target.closest(".osss-moved-tool")) {
+        e.stopPropagation();
+      }
+    };
+    dropdownContent.addEventListener("mousedown", currentMenuMousedownListener);
+
+    // Onshape's contextmenu handler can dispatch a synthetic click (to dismiss its own
+    // open popovers) before showing the Update/Remove dialog.  That synthetic click
+    // reaches our document-level listener and collapses any open subfolders.  Detect
+    // the contextmenu-inside-moved-tool case and tell the document click listener to
+    // skip one cycle so the subfolder stays open while the dialog is visible.
+    menuRoot.addEventListener("contextmenu", (e) => {
+      if (e.target.closest(".osss-moved-tool")) {
+        pendingRightClickInMenu = true;
+      }
+    });
 
     // Close all open submenus when the user clicks outside the menu.
     if (currentMenuClickListener) {
       document.removeEventListener("click", currentMenuClickListener);
     }
-    currentMenuClickListener = () => {
+    currentMenuClickListener = (e) => {
       if (!menuRoot.isConnected) {
         document.removeEventListener("click", currentMenuClickListener);
         currentMenuClickListener = null;
         return;
       }
-      menuRoot.querySelectorAll(".osss-folder.osss-open").forEach((f) => f.classList.remove("osss-open"));
+      // Suppress one outside-click cycle when it originates from interacting with
+      // Onshape's contextmenu dialog (which appeared after a right-click inside one
+      // of our moved-tool elements).
+      if (pendingRightClickInMenu) {
+        pendingRightClickInMenu = false;
+        return;
+      }
+      menuRoot.querySelectorAll(".osss-folder.osss-open").forEach((f) => {
+        if (f.dataset.folderId) openFolderIds.delete(f.dataset.folderId);
+        f.classList.remove("osss-open");
+      });
     };
     document.addEventListener("click", currentMenuClickListener);
   }
@@ -317,8 +408,11 @@
                 <button type="button" class="osss-btn" data-action="add-folder">New</button>
                 <button type="button" class="osss-btn" data-action="rename-folder">Rename</button>
                 <button type="button" class="osss-btn" data-action="delete-folder">Delete</button>
+                <button type="button" class="osss-btn" data-action="export-folder">Export</button>
+                <button type="button" class="osss-btn" data-action="import-folder">Import</button>
               </div>
             </div>
+            <input type="file" data-role="import-file-input" accept=".json" style="display:none">
             <div class="osss-tree-root">
               <ul class="osss-tree" data-root="true"></ul>
             </div>
@@ -737,6 +831,195 @@
       selectedFolderId = ctx.parentFolderId || ROOT_ID;
       showAllTools = false;
       rerenderAll();
+    });
+
+    function exportFolderSubtree(node) {
+      if (node.type === "tool") {
+        return { type: "tool", id: node.id };
+      }
+      return {
+        type: "folder",
+        name: node.name || "Folder",
+        children: (node.children || []).map(exportFolderSubtree)
+      };
+    }
+
+    function folderNameToFilename(name) {
+      const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+      return "osss-" + (slug || "folder") + ".json";
+    }
+
+    modal.querySelector('[data-action="export-folder"]').addEventListener("click", () => {
+      let exportData;
+      let filename;
+      if (selectedFolderId === ROOT_ID) {
+        exportData = {
+          version: "1",
+          type: "osss-folder-pack",
+          folders: workingTree.filter((n) => n.type === "folder").map(exportFolderSubtree)
+        };
+        filename = "osss-all-folders.json";
+      } else {
+        const folder = getFolderById(workingTree, selectedFolderId);
+        if (!folder || folder.type !== "folder") return;
+        exportData = {
+          version: "1",
+          type: "osss-folder-pack",
+          folders: [exportFolderSubtree(folder)]
+        };
+        filename = folderNameToFilename(folder.name || "folder");
+      }
+
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      try {
+        a.click();
+      } finally {
+        a.remove();
+        URL.revokeObjectURL(url);
+      }
+    });
+
+    function importFolderSubtree(node) {
+      if (!node || typeof node !== "object") return null;
+      if (node.type === "tool" && node.id) {
+        return { type: "tool", id: node.id };
+      }
+      if (node.type === "folder") {
+        return {
+          type: "folder",
+          id: getNextFolderId(),
+          name: node.name || "Imported Folder",
+          children: (Array.isArray(node.children) ? node.children : [])
+            .map(importFolderSubtree)
+            .filter(Boolean)
+        };
+      }
+      return null;
+    }
+
+    const importFileInput = modal.querySelector('[data-role="import-file-input"]');
+    modal.querySelector('[data-action="import-folder"]').addEventListener("click", () => {
+      importFileInput.value = "";
+      importFileInput.click();
+    });
+
+    function mergeFolderChildren(existingFolder, incomingFolder) {
+      existingFolder.children = existingFolder.children || [];
+      for (const child of incomingFolder.children || []) {
+        if (child.type === "tool") {
+          const alreadyPresent = existingFolder.children.some(
+            (c) => c.type === "tool" && c.id === child.id
+          );
+          if (!alreadyPresent) existingFolder.children.push({ type: "tool", id: child.id });
+        } else if (child.type === "folder") {
+          const matchingSub = existingFolder.children.find(
+            (c) => c.type === "folder" && c.name === child.name
+          );
+          if (matchingSub) {
+            mergeFolderChildren(matchingSub, child);
+          } else {
+            existingFolder.children.push(importFolderSubtree(child));
+          }
+        }
+      }
+    }
+
+    function resolveImportConflicts(incoming, targetChildren) {
+      const decisions = new Map();
+      for (const folder of incoming) {
+        if (folder.type !== "folder") continue;
+        const existing = targetChildren.find(
+          (c) => c.type === "folder" && c.name === folder.name
+        );
+        if (!existing) continue;
+
+        const choice = prompt(
+          `A folder named "${folder.name}" already exists here.\n\nChoose an action:\n  merge   – combine contents (keep both)\n  replace – overwrite existing folder\n  skip    – do not import this folder\n\nType merge, replace, or skip:`,
+          "merge"
+        );
+
+        decisions.set(folder, (choice || "skip").trim().toLowerCase());
+      }
+      return decisions;
+    }
+
+    function applyImportedFolders(incoming, targetChildren, decisions) {
+      for (const folder of incoming) {
+        if (folder.type !== "folder") {
+          targetChildren.push(folder);
+          continue;
+        }
+
+        const existingIdx = targetChildren.findIndex(
+          (c) => c.type === "folder" && c.name === folder.name
+        );
+        const action = decisions.get(folder);
+
+        if (existingIdx === -1 || action === undefined) {
+          targetChildren.push(folder);
+        } else if (action === "replace") {
+          folder.id = getNextFolderId();
+          targetChildren.splice(existingIdx, 1, folder);
+        } else if (action === "merge") {
+          mergeFolderChildren(targetChildren[existingIdx], folder);
+        }
+        // "skip" — do nothing
+      }
+    }
+
+    importFileInput.addEventListener("change", () => {
+      const file = importFileInput.files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onerror = () => {
+        alert("Failed to read the file.");
+      };
+      reader.onload = (e) => {
+        let parsed;
+        try {
+          parsed = JSON.parse(e.target.result);
+        } catch {
+          alert("Invalid JSON file.");
+          return;
+        }
+
+        if (
+          !parsed ||
+          parsed.type !== "osss-folder-pack" ||
+          !Array.isArray(parsed.folders) ||
+          !parsed.folders.length
+        ) {
+          alert("Not a valid folder pack file.");
+          return;
+        }
+
+        const imported = parsed.folders.map(importFolderSubtree).filter(Boolean);
+
+        let targetChildren;
+        if (selectedFolderId === ROOT_ID) {
+          targetChildren = workingTree;
+        } else {
+          const targetFolder = getFolderById(workingTree, selectedFolderId);
+          if (targetFolder && targetFolder.type === "folder") {
+            targetFolder.children = targetFolder.children || [];
+            targetChildren = targetFolder.children;
+          } else {
+            targetChildren = workingTree;
+          }
+        }
+
+        const decisions = resolveImportConflicts(imported, targetChildren);
+        applyImportedFolders(imported, targetChildren, decisions);
+
+        rerenderAll();
+      };
+      reader.readAsText(file);
     });
 
     filterBtn.addEventListener("click", () => {
